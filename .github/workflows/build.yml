@@ -11,8 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Descargar Código Fuente
+    - name: Descargar Código Fuente y Submódulos
       uses: actions/checkout@v4
+      with:
+        # Crucial: Esto le dice a GitHub que clone crosslibc dentro de su carpeta
+        submodules: 'recursive'
 
     - name: Instalar Compilador Cruzado para formato PE/COFF (UEFI)
       run: |
@@ -21,16 +24,15 @@ jobs:
 
     - name: Compilar Archivos Objeto (C a .o)
       run: |
-        # 1. Agregamos -DCLIBC_NO_LL_HEAP para forzar a crosslibc a abrir tu heap de mmap en user_impl.h
-        # 2. Quitamos las rutas gnu-efi antiguas ya que resolviste las constantes localmente
+        # 1. -DCLIBC_NO_LL_HEAP activa tu heap_alloc basado en mmap
+        # 2. -Icrosslibc le indica al compilador que busque las cabeceras estándar (como string.h) dentro del submódulo
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
           -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar \
           -DCLIBC_NO_LL_HEAP \
-          -I. -c main.c linux-uefi.c clibc-user-impl.c
+          -I. -Icrosslibc -c main.c linux-uefi.c clibc-user-impl.c
 
     - name: Enlazar Binario Final con Formato .efi
       run: |
-        # Unimos los objetos generados apuntando al punto de entrada efi_main
         x86_64-w64-mingw32-gcc -nostdlib -shared \
           -Wl,--subsystem,10 -Wl,-e efi_main \
           main.o linux-uefi.o clibc-user-impl.o \
