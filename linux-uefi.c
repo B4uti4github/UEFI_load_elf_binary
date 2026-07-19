@@ -523,14 +523,24 @@ int fd_open(const char *pathname, int flags) {
 		OpenMode |= EFI_FILE_MODE_WRITE;
 
 	const char *path = normalize_path(pathname);
+	
+	debug_print("fd_open: trying to open: ");
+	debug_print(path);
+	debug_print("\r\n");
+	
 	EFI_STATUS status = uefi_call_wrapper(Volume->Open, 5, Volume, &FileHandle, bstr_to_wstr(path), OpenMode, (flags & O_DIRECTORY)?EFI_FILE_DIRECTORY:0);
-	if (EFI_ERROR(status))
+	
+	if (EFI_ERROR(status)) {
+		debug_print("fd_open: Volume->Open failed with status\r\n");
 		return -efi_status_to_errno(status);
+	}
 
 	EFI_FILE_INFO info;
 	status = fd_efi_get_file_info(FileHandle, &info);
-	if (EFI_ERROR(status))
+	if (EFI_ERROR(status)) {
+		debug_print("fd_open: GetInfo failed\r\n");
 		return -efi_status_to_errno(status);
+	}
 
 	if (flags & O_APPEND) {
 		uefi_call_wrapper(FileHandle->SetPosition, 2, FileHandle, 0xFFFFFFFFFFFFFFFF);
@@ -548,6 +558,7 @@ int fd_open(const char *pathname, int flags) {
 			return -EISDIR;
 	}
 
+	debug_print("fd_open: success\r\n");
 	return TO_VIRTUAL_FD(fd);
 }
 
