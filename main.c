@@ -133,10 +133,6 @@ int main(int argc, char **argv) {
         // Fallback duro por si se ejecuta vacío: le clavamos el nombre exacto de tu Toybox
         ELF_FILENAME = "toybox-x86_64"; 
     }
-    
-    /* else continue with execution */
-    /* mov rsi, [rbp+8*3]; mov [ELF_FILENAME], rsi */
-    ELF_FILENAME = argv[1];
 
     /* **** Create a buffer for read operations to store them read bytes into **** */
     /* Do this with mmap: void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset); */
