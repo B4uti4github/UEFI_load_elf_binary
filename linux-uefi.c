@@ -535,27 +535,34 @@ int fd_open(const char *pathname, int flags) {
 		return -efi_status_to_errno(status);
 	}
 
-	EFI_FILE_INFO info;
+	debug_print("fd_open: file opened, storing fd\r\n");
+	fds[fd] = FileHandle;
+
+	EFI_FILE_INFO info = {0};
 	status = fd_efi_get_file_info(FileHandle, &info);
 	if (EFI_ERROR(status)) {
-		debug_print("fd_open: GetInfo failed\r\n");
-		return -efi_status_to_errno(status);
-	}
-
-	if (flags & O_APPEND) {
-		uefi_call_wrapper(FileHandle->SetPosition, 2, FileHandle, 0xFFFFFFFFFFFFFFFF);
+		debug_print("fd_open: GetInfo failed, but continuing\r\n");
+		/* Continue anyway - some files might not support GetInfo */
 	} else {
-		if (OpenMode & EFI_FILE_MODE_WRITE) {
-			info.FileSize = 0;
-			fd_efi_set_file_info(FileHandle, &info);
+		if (flags & O_APPEND) {
+			uefi_call_wrapper(FileHandle->SetPosition, 2, FileHandle, info.FileSize);
+		} else {
+			if (OpenMode & EFI_FILE_MODE_WRITE) {
+				info.FileSize = 0;
+				fd_efi_set_file_info(FileHandle, &info);
+			}
 		}
-	}
-	if (flags & O_DIRECTORY) {
-		if (!(info.Attribute & EFI_FILE_DIRECTORY))
-			return -ENOTDIR;
-	} else {
-		if (info.Attribute & EFI_FILE_DIRECTORY)
-			return -EISDIR;
+		if (flags & O_DIRECTORY) {
+			if (!(info.Attribute & EFI_FILE_DIRECTORY)) {
+				debug_print("fd_open: not a directory\r\n");
+				return -ENOTDIR;
+			}
+		} else {
+			if (info.Attribute & EFI_FILE_DIRECTORY) {
+				debug_print("fd_open: is a directory\r\n");
+				return -EISDIR;
+			}
+		}
 	}
 
 	debug_print("fd_open: success\r\n");
