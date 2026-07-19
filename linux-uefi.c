@@ -456,7 +456,7 @@ int time_sleep(struct timeval *duration) {
 static
 int fd_real_find_free() {
 	for (unsigned it = 0; it != MAX_FDS; it++) {
-	   if (fds[it])
+	   if (!fds[it])
 		   return it;
 	}
 
