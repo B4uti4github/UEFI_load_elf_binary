@@ -16,26 +16,30 @@ jobs:
       with:
         submodules: 'recursive'
 
-    - name: Instalar Compilador Cruzado y Cabeceras UEFI de GNU
+    - name: Instalar Compilador Cruzado para formato PE/COFF (UEFI)
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc-mingw-w64-x86-64 build-essential gnu-efi
 
     - name: Compilar Archivos Objeto (C a .o)
       run: |
+        # 1. -DCLIBC_NO_LL_HEAP activa tu heap dinámico
+        # 2. -DGNU_EFI_USE_MS_ABI obliga al compilador a traducir efi_callX de manera nativa en x86_64
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
           -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar -fno-builtin \
-          -DCLIBC_NO_LL_HEAP -D__KERNEL__ \
+          -DCLIBC_NO_LL_HEAP -D__KERNEL__ -DGNU_EFI_USE_MS_ABI \
           -I. -Icrosslibc -I/usr/include/efi -I/usr/include/efi/x86_64 \
           -c main.c linux-uefi.c clibc-user-impl.c crosslibc/string.c
 
     - name: Enlazar Binario Final con Formato .efi
       run: |
+        # -Wl,--entry=efi_main fuerza el arranque directo omitiendo atexit de Windows
+        # Incluimos los objetos locales mapeados en el orden correcto
         x86_64-w64-mingw32-gcc -nostdlib -shared \
           -Wl,--subsystem,10 -Wl,--entry=efi_main -Wl,-e,efi_main \
           -Wl,--allow-multiple-definition \
           main.o clibc-user-impl.o string.o linux-uefi.o \
-          -L/usr/lib -lgnuefi -lefi -lgcc \
+          -lgcc \
           -o load_elf_binary.efi
 
     - name: Guardar Artefacto Ejecutable (.efi)
