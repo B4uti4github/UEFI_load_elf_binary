@@ -64,6 +64,37 @@ int main(int argc, char **argv);
 static
 EFI_FILE_HANDLE GetVolume(EFI_HANDLE image);
 
+static
+int parse_load_options(CHAR16 *loadOptions, char **argv, int maxArgc, char *argvBuf, int bufSize) {
+    if (!loadOptions || !argv || maxArgc <= 1 || bufSize <= 0)
+        return 0;
+
+    int argc = 0;
+    int pos = 0;
+
+    /* Convert UTF-16 load options to ASCII in-place */
+    for (; loadOptions[pos] && pos < bufSize - 1; pos++) {
+        argvBuf[pos] = (char)loadOptions[pos];
+    }
+    argvBuf[pos] = '\0';
+
+    char *p = argvBuf;
+    while (*p && argc < maxArgc) {
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (!*p)
+            break;
+
+        argv[argc++] = p;
+        while (*p && *p != ' ' && *p != '\t')
+            p++;
+        if (*p)
+            *p++ = '\0';
+    }
+
+    return argc;
+}
+
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 	InitializeLib(ImageHandle, SystemTable);
 
@@ -76,10 +107,20 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 
 	uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, L"Initialized! Calling main()...\r\n");
 
-	/* Stub argv, argc for now */
-	char *argv[1] = {"main.efi"};
+	EFI_LOADED_IMAGE *loaded_image = NULL;
+	EFI_GUID lipGuid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+	uefi_call_wrapper(BS->HandleProtocol, 3, ImageHandle, &lipGuid, (void **)&loaded_image);
 
-	return main(1, argv)?EFI_END_OF_FILE/*?*/:EFI_SUCCESS;
+	char *argv[16];
+	static char argvBuf[1024];
+	int argc = 1;
+	argv[0] = "main.efi";
+
+	if (loaded_image && loaded_image->LoadOptions && loaded_image->LoadOptionsSize) {
+		argc += parse_load_options((CHAR16 *)loaded_image->LoadOptions, argv + 1, 15, argvBuf, sizeof(argvBuf));
+	}
+
+	return main(argc, argv)?EFI_END_OF_FILE/*?*/:EFI_SUCCESS;
 }
 
 
