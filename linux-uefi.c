@@ -184,18 +184,34 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 	int argc = 1;
 	argv[0] = "load_elf_binary.efi";
 
-	if (loaded_image && loaded_image->LoadOptions && loaded_image->LoadOptionsSize) {
+	if (loaded_image && loaded_image->LoadOptions && loaded_image->LoadOptionsSize > 0) {
 		int parsed = parse_load_options(loaded_image->LoadOptions, loaded_image->LoadOptionsSize, argv + 1, 15, argvBuf, sizeof(argvBuf));
 		argc += parsed;
 		if (parsed > 0) {
-			debug_print("efi_main: parsed arg=\r\n");
+			debug_print("efi_main: LoadOptions parsed OK, argc now=");
+			// Simple number print
+			char num[16] = {0};
+			int tmp = argc;
+			if (tmp == 0) num[0] = '0';
+			else {
+				int pos = 0;
+				int divisor = 1;
+				while (tmp / divisor >= 10) divisor *= 10;
+				while (divisor > 0) {
+					num[pos++] = '0' + (tmp / divisor);
+					tmp %= divisor;
+					divisor /= 10;
+				}
+			}
+			debug_print(num);
+			debug_print("\r\nFirst arg: ");
 			debug_print(argv[1]);
 			debug_print("\r\n");
 		} else {
-			debug_print("efi_main: no args parsed\r\n");
+			debug_print("efi_main: LoadOptions parse returned 0\r\n");
 		}
 	} else {
-		debug_print("efi_main: no LoadOptions\r\n");
+		debug_print("efi_main: LoadOptions empty or NULL\r\n");
 	}
 
 	return main(argc, argv)?EFI_END_OF_FILE/*?*/:EFI_SUCCESS;

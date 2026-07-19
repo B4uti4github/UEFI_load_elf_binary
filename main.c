@@ -118,20 +118,37 @@ void print_error() {
 int main(int argc, char **argv) {
     /* **** Save the filename argument into the filename variable **** */
     
-    // COMENTAMOS EL COLO PARA EVITAR EL RETORNO DE USAGE SI ARGC VARÍA EN UEFI
-    // if (argc != 2) {
-    //     goto print_usage;
-    // }
-
-    // Si argc es igual a 2, tomamos el argumento normal.
-    // Si la shell lo mapeó diferente y argc es 1, asumimos que el primer parámetro es el ELF.
     if (argc >= 2) {
         ELF_FILENAME = argv[1];
-    } else if (argc == 1 && argv[0] != NULL) {
-        ELF_FILENAME = argv[0];
+        print_text("Got arg from argv[1]: ");
+        print_text(ELF_FILENAME);
+        print_text("\n");
     } else {
-        // Fallback duro por si se ejecuta vacío: le clavamos el nombre exacto de tu Toybox
-        ELF_FILENAME = "toybox-x86_64"; 
+        // No argument provided - try a fallback
+        print_text("No argument provided. argc=");
+        // Print argc as a simple number
+        char argc_str[16];
+        for (int i = 0; i < 16; i++) argc_str[i] = 0;
+        int tmp = argc;
+        int pos = 0;
+        if (tmp == 0) {
+            argc_str[0] = '0';
+            pos = 1;
+        } else {
+            int divisor = 1;
+            while (tmp / divisor >= 10) divisor *= 10;
+            while (divisor > 0) {
+                argc_str[pos++] = '0' + (tmp / divisor);
+                tmp %= divisor;
+                divisor /= 10;
+            }
+        }
+        print_text(argc_str);
+        print_text("\n");
+        
+        // Fallback: try common names
+        ELF_FILENAME = "sash";
+        print_text("Using fallback: sash\n");
     }
 
     /* **** Create a buffer for read operations to store them read bytes into **** */
