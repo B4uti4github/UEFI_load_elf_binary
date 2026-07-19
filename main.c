@@ -118,37 +118,49 @@ void print_error() {
 int main(int argc, char **argv) {
     /* **** Save the filename argument into the filename variable **** */
     
-    if (argc >= 2) {
-        ELF_FILENAME = argv[1];
-        print_text("Got arg from argv[1]: ");
-        print_text(ELF_FILENAME);
-        print_text("\n");
+    print_text("main() called with argc=");
+    char argc_str[16];
+    for (int i = 0; i < 16; i++) argc_str[i] = 0;
+    int tmp = argc;
+    int pos = 0;
+    if (tmp == 0) {
+        argc_str[0] = '0';
+        pos = 1;
     } else {
-        // No argument provided - try a fallback
-        print_text("No argument provided. argc=");
-        // Print argc as a simple number
-        char argc_str[16];
-        for (int i = 0; i < 16; i++) argc_str[i] = 0;
-        int tmp = argc;
-        int pos = 0;
-        if (tmp == 0) {
-            argc_str[0] = '0';
-            pos = 1;
-        } else {
-            int divisor = 1;
-            while (tmp / divisor >= 10) divisor *= 10;
-            while (divisor > 0) {
-                argc_str[pos++] = '0' + (tmp / divisor);
-                tmp %= divisor;
-                divisor /= 10;
-            }
+        int divisor = 1;
+        while (tmp / divisor >= 10) divisor *= 10;
+        while (divisor > 0) {
+            argc_str[pos++] = '0' + (tmp / divisor);
+            tmp %= divisor;
+            divisor /= 10;
         }
-        print_text(argc_str);
+    }
+    print_text(argc_str);
+    print_text("\n");
+    
+    if (argc >= 3) {
+        // argv[1] is the program name, real arg is argv[2]
+        print_text("Using argv[2]: ");
+        ELF_FILENAME = argv[2];
+        print_text(argv[2]);
         print_text("\n");
-        
-        // Fallback: try common names
+    } else if (argc >= 2 && argv[1] != NULL) {
+        // Check if argv[1] looks like the program name or actual arg
+        if (argv[1][0] != 'l' || argv[1][1] != 'o') {
+            // Doesn't look like "load_elf_binary.efi"
+            ELF_FILENAME = argv[1];
+            print_text("Using argv[1]: ");
+            print_text(argv[1]);
+            print_text("\n");
+        } else {
+            // argv[1] is the program name, use fallback
+            print_text("argv[1] looks like program name, using fallback\n");
+            ELF_FILENAME = "sash";
+        }
+    } else {
+        // No arguments, use fallback
+        print_text("No real arguments, using fallback\n");
         ELF_FILENAME = "sash";
-        print_text("Using fallback: sash\n");
     }
 
     /* **** Create a buffer for read operations to store them read bytes into **** */

@@ -204,9 +204,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 				}
 			}
 			debug_print(num);
-			debug_print("\r\nFirst arg: ");
+			debug_print("\r\nargv[1]=");
 			debug_print(argv[1]);
 			debug_print("\r\n");
+			if (argc >= 3) {
+				debug_print("argv[2]=");
+				debug_print(argv[2]);
+				debug_print("\r\n");
+			}
 		} else {
 			debug_print("efi_main: LoadOptions parse returned 0\r\n");
 		}
