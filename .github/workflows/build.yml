@@ -1,0 +1,41 @@
+name: Build Linux-UEFI Executable Application (.efi)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-uefi:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Descargar Código Fuente
+      uses: actions/checkout@v4
+
+    - name: Instalar Compilador Cruzado para formato PE/COFF (UEFI)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-mingw-w64-x86-64 build-essential
+
+    - name: Compilar Archivos Objeto (C a .o)
+      run: |
+        # Compilamos agregando las flags críticas de compatibilidad UEFI
+        x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
+          -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar \
+          -I. -c main.c linux-uefi.c clibc-user-impl.c
+
+    - name: Enlazar Binario Final con Formato .efi
+      run: |
+        # Unimos los objetos generados apuntando al punto de entrada efi_main
+        x86_64-w64-mingw32-gcc -nostdlib -shared \
+          -Wl,--subsystem,10 -Wl,-e efi_main \
+          main.o linux-uefi.o clibc-user-impl.o \
+          -o load_elf_binary.efi
+
+    - name: Guardar Artefacto Ejecutable (.efi)
+      uses: actions/upload-artifact@v4
+      with:
+        name: uefi-loader-binary
+        path: load_elf_binary.efi
