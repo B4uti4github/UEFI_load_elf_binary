@@ -63,6 +63,8 @@ int main(int argc, char **argv);
 
 static
 EFI_FILE_HANDLE GetVolume(EFI_HANDLE image);
+static
+CHAR16 *bstr_to_wstr(const char *input);
 
 static
 void debug_print(const char *msg) {
