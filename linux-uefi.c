@@ -4,6 +4,78 @@
  * Copyright (C) 2023 Nils Sauer <tuxifan@posteo.de>
  */
 
+ /* SPDX-License-Identifier: LGPL-2.1 OR MIT */
+/*
+ * Linux-compatible wrapper around UEFI
+ * Copyright (C) 2023 Nils Sauer <tuxifan@posteo.de>
+ */
+
+#ifndef LINUX_UEFI_USE_INTERNAL_INTS
+#	define LINUX_UEFI_USE_INTERNAL_INTS
+#endif /* LINUX_UEFI_USE_INTERNAL_INTS */
+#include "linux-uefi.h"
+#include "linux-uefi-syscalls.h"
+
+#include <efi.h>
+#include <efilib.h>
+
+
+/* Macros */
+#define MAX_FDS 16
+#define VIRTUAL_FD_BASE 4
+#define TO_REAL_FD(fd) (fd-VIRTUAL_FD_BASE)
+#define TO_VIRTUAL_FD(fd) (fd+VIRTUAL_FD_BASE)
+
+#define EMU_PID 2
+#define EMU_UID 1000
+#define EMU_GID 1000
+
+/* Global variables */
+char *environ[] = {NULL};
+const unsigned long _auxv[] = {0};
+
+/* startup code and handles */
+static EFI_HANDLE Image;
+static EFI_FILE_HANDLE Volume;
+static EFI_FILE_HANDLE fds[MAX_FDS];
+
+
+
+extern
+int main(int argc, char **argv);
+
+// 1. Matar las referencias falsas 'extern' obligando al enlazador a usar tus variables
+#ifdef ST
+#undef ST
+#endif
+#ifdef BS
+#undef BS
+#endif
+#ifdef RT
+#undef RT
+#endif
+
+void *ST;
+void *BS;
+void *RT;
+
+// 2. Implementar InitializeLib de forma manual para satisfacer al compilador
+int InitializeLib(void *ImageHandle, void *SystemTable) {
+    ST = SystemTable;
+    // En las estructuras de UEFI x86_64, BootServices está en el offset 96 y RuntimeServices en el 104
+    BS = *(void **)((char *)SystemTable + 96);
+    RT = *(void **)((char *)SystemTable + 104);
+    (void)ImageHandle;
+    return 0; // EFI_SUCCESS
+}
+
+// 3. Crear un atexit vacío falso para apagar el error final de MinGW
+int atexit(void (*function)(void)) {
+    (void)function;
+    return 0;
+}
+
+
 #ifndef LINUX_UEFI_USE_INTERNAL_INTS
 #	define LINUX_UEFI_USE_INTERNAL_INTS
 #endif /* LINUX_UEFI_USE_INTERNAL_INTS */
