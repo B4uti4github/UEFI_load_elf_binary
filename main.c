@@ -145,12 +145,16 @@ int main(int argc, char **argv) {
     }
 
     /* First open the efi file - creating a file handle, initializing structs and pointers */
+    print_text("Opening ELF file: ");
+    print_text(ELF_FILENAME);
+    print_text("\n");
     /* .open_efi: */
     /* mov rax, __NR_open; mov rdi, ELF_FILENAME; mov rsi, O_RDONLY; syscall */
     ELF_FILE_FD = open(ELF_FILENAME, O_RDONLY);
     
     /* test rax, rax; js .error */
     if (ELF_FILE_FD < 0) {
+        print_text("open failed\n");
         goto error;
     }
 
@@ -160,7 +164,12 @@ int main(int argc, char **argv) {
     ssize_t bytes_read = read(ELF_FILE_FD, IO_BUFFER, 4);
     
     /* cmp byte [IO_BUFFER+0], ELFMAG0; jne .error */
-    if (bytes_read < 4 || (unsigned char)IO_BUFFER[0] != ELFMAG0) {
+    if (bytes_read < 4) {
+        print_text("read failed\n");
+        goto error;
+    }
+    if ((unsigned char)IO_BUFFER[0] != ELFMAG0) {
+        print_text("bad ELF magic\n");
         goto error;
     }
     /* ... */

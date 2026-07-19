@@ -65,19 +65,26 @@ static
 EFI_FILE_HANDLE GetVolume(EFI_HANDLE image);
 
 static
-int parse_load_options(CHAR16 *loadOptions, char **argv, int maxArgc, char *argvBuf, int bufSize) {
-    if (!loadOptions || !argv || maxArgc <= 1 || bufSize <= 0)
+void debug_print(const char *msg) {
+    if (!msg)
+        return;
+    uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, bstr_to_wstr(msg));
+}
+
+static
+int parse_load_options_ascii(const char *loadOptions, int loadOptionsSize, char **argv, int maxArgc, char *argvBuf, int bufSize) {
+    if (!loadOptions || !argv || maxArgc <= 1 || bufSize <= 0 || loadOptionsSize <= 0)
         return 0;
 
+    int len = loadOptionsSize;
+    if (len > bufSize - 1)
+        len = bufSize - 1;
+
+    for (int i = 0; i < len; i++)
+        argvBuf[i] = loadOptions[i];
+    argvBuf[len] = '\0';
+
     int argc = 0;
-    int pos = 0;
-
-    /* Convert UTF-16 load options to ASCII in-place */
-    for (; loadOptions[pos] && pos < bufSize - 1; pos++) {
-        argvBuf[pos] = (char)loadOptions[pos];
-    }
-    argvBuf[pos] = '\0';
-
     char *p = argvBuf;
     while (*p && argc < maxArgc) {
         while (*p == ' ' || *p == '\t')
@@ -91,6 +98,65 @@ int parse_load_options(CHAR16 *loadOptions, char **argv, int maxArgc, char *argv
         if (*p)
             *p++ = '\0';
     }
+
+    return argc;
+}
+
+static
+int parse_load_options_utf16(CHAR16 *loadOptions, char **argv, int maxArgc, char *argvBuf, int bufSize) {
+    if (!loadOptions || !argv || maxArgc <= 1 || bufSize <= 0)
+        return 0;
+
+    int pos = 0;
+    while (loadOptions[pos] && pos < bufSize - 1) {
+        argvBuf[pos] = (char)loadOptions[pos];
+        pos++;
+    }
+    argvBuf[pos] = '\0';
+
+    int argc = 0;
+    char *p = argvBuf;
+    while (*p && argc < maxArgc) {
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (!*p)
+            break;
+
+        argv[argc++] = p;
+        while (*p && *p != ' ' && *p != '\t')
+            p++;
+        if (*p)
+            *p++ = '\0';
+    }
+
+    return argc;
+}
+
+static
+int parse_load_options(VOID *loadOptions, UINTN loadOptionsSize, char **argv, int maxArgc, char *argvBuf, int bufSize) {
+    if (!loadOptions || !argv || maxArgc <= 1 || bufSize <= 0 || loadOptionsSize == 0)
+        return 0;
+
+    const unsigned char *bytes = loadOptions;
+    int isUtf16 = 0;
+    if (loadOptionsSize % 2 == 0) {
+        int samples = (int)loadOptionsSize / 2;
+        if (samples > 16)
+            samples = 16;
+        int zeros = 0;
+        for (int i = 0; i < samples; i++) {
+            if (bytes[i*2 + 1] == 0)
+                zeros++;
+        }
+        if (zeros * 2 >= samples)
+            isUtf16 = 1;
+    }
+
+    int argc = 0;
+    if (isUtf16)
+        argc = parse_load_options_utf16((CHAR16 *)loadOptions, argv, maxArgc, argvBuf, bufSize);
+    if (argc == 0)
+        argc = parse_load_options_ascii((const char *)loadOptions, (int)loadOptionsSize, argv, maxArgc, argvBuf, bufSize);
 
     return argc;
 }
@@ -114,10 +180,20 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 	char *argv[16];
 	static char argvBuf[1024];
 	int argc = 1;
-	argv[0] = "main.efi";
+	argv[0] = "load_elf_binary.efi";
 
 	if (loaded_image && loaded_image->LoadOptions && loaded_image->LoadOptionsSize) {
-		argc += parse_load_options((CHAR16 *)loaded_image->LoadOptions, argv + 1, 15, argvBuf, sizeof(argvBuf));
+		int parsed = parse_load_options(loaded_image->LoadOptions, loaded_image->LoadOptionsSize, argv + 1, 15, argvBuf, sizeof(argvBuf));
+		argc += parsed;
+		if (parsed > 0) {
+			debug_print("efi_main: parsed arg=\r\n");
+			debug_print(argv[1]);
+			debug_print("\r\n");
+		} else {
+			debug_print("efi_main: no args parsed\r\n");
+		}
+	} else {
+		debug_print("efi_main: no LoadOptions\r\n");
 	}
 
 	return main(argc, argv)?EFI_END_OF_FILE/*?*/:EFI_SUCCESS;
@@ -393,6 +469,19 @@ EFI_STATUS fd_efi_set_file_info(EFI_FILE_HANDLE FileHandle, const EFI_FILE_INFO 
 	return uefi_call_wrapper(FileHandle->SetInfo, 4, FileHandle, &infoGuid, fsiz, &info);
 }
 
+static
+const char *normalize_path(const char *path) {
+    if (!path)
+        return NULL;
+    if ((path[0] == 'F' || path[0] == 'f') && (path[1] == 'S' || path[1] == 's') && path[2] == '0' && path[3] == ':') {
+        const char *p = path + 4;
+        if (*p == '\\' || *p == '/')
+            p++;
+        return p;
+    }
+    return path;
+}
+
 int fd_open(const char *pathname, int flags) {
 	int fd = fd_real_find_free();
 
@@ -410,7 +499,8 @@ int fd_open(const char *pathname, int flags) {
 	if (flags & O_WRONLY || flags & O_RDWR)
 		OpenMode |= EFI_FILE_MODE_WRITE;
 
-	EFI_STATUS status = uefi_call_wrapper(Volume->Open, 5, Volume, &FileHandle, bstr_to_wstr(pathname), OpenMode, (flags & O_DIRECTORY)?EFI_FILE_DIRECTORY:0);
+	const char *path = normalize_path(pathname);
+	EFI_STATUS status = uefi_call_wrapper(Volume->Open, 5, Volume, &FileHandle, bstr_to_wstr(path), OpenMode, (flags & O_DIRECTORY)?EFI_FILE_DIRECTORY:0);
 	if (EFI_ERROR(status))
 		return -efi_status_to_errno(status);
 
@@ -740,7 +830,8 @@ int fd_fstat(int fd, struct stat *buf) {
 
 int fd_stat(const char *path, struct stat *buf) {
 	EFI_FILE_HANDLE FileHandle;
-	EFI_STATUS status = uefi_call_wrapper(Volume->Open, 5, Volume, &FileHandle, bstr_to_wstr(path), EFI_FILE_MODE_READ, 0);
+	const char *normalized = normalize_path(path);
+	EFI_STATUS status = uefi_call_wrapper(Volume->Open, 5, Volume, &FileHandle, bstr_to_wstr(normalized), EFI_FILE_MODE_READ, 0);
 	if (EFI_ERROR(status))
 		return -efi_status_to_errno(status);
 
