@@ -1,0 +1,3 @@
+[submodule "crosslibc"]
+	path = crosslibc
+	url = https://github.com/niansa/crosslibc.git

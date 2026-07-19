@@ -21,9 +21,11 @@ jobs:
 
     - name: Compilar Archivos Objeto (C a .o)
       run: |
-        # Compilamos agregando las flags críticas de compatibilidad UEFI
+        # 1. Agregamos -DCLIBC_NO_LL_HEAP para forzar a crosslibc a abrir tu heap de mmap en user_impl.h
+        # 2. Quitamos las rutas gnu-efi antiguas ya que resolviste las constantes localmente
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
           -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar \
+          -DCLIBC_NO_LL_HEAP \
           -I. -c main.c linux-uefi.c clibc-user-impl.c
 
     - name: Enlazar Binario Final con Formato .efi

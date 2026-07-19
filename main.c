@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <string.h>
 #include <errno.h>
 
@@ -17,6 +16,30 @@
 #endif
 
 #define ELFMAG0 0x7f /* \177 */
+
+// DEFINICIONES MANUALES REEMPLAZANDO A "sys/mman.h"
+#ifndef MAP_FAILED
+#define MAP_FAILED ((void *) -1)
+#endif
+
+#ifndef PROT_READ
+#define PROT_READ      0x1
+#endif
+
+#ifndef PROT_WRITE
+#define PROT_WRITE     0x2
+#endif
+
+#ifndef MAP_PRIVATE
+#define MAP_PRIVATE    0x02
+#endif
+
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS  0x20
+#endif
+
+// Declaración explícita de mmap para evitar "implicit declaration" warnings
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 
 /* section .bss */
 char *ELF_FILENAME;   /* quad word variable to store the char pointer to the filename */
