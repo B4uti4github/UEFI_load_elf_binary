@@ -19,27 +19,27 @@ jobs:
     - name: Instalar Compilador Cruzado y Cabeceras UEFI de GNU
       run: |
         sudo apt-get update
-        # Se reinstala gnu-efi estrictamente para heredar las cabeceras efi.h
         sudo apt-get install -y gcc-mingw-w64-x86-64 build-essential gnu-efi
 
     - name: Compilar Archivos Objeto (C a .o)
       run: |
-        # 1. -DCLIBC_NO_LL_HEAP habilita tu heap allocator por mmap
-        # 2. Las rutas /usr/include/efi le entregan a linux-uefi.c el archivo efi.h que reclama
+        # Añadimos -DCLIBC_NO_LL_HEAP y -D__KERNEL__ para forzar la emulación correcta
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
           -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar -fno-builtin \
-          -DCLIBC_NO_LL_HEAP \
+          -DCLIBC_NO_LL_HEAP -D__KERNEL__ \
           -I. -Icrosslibc -I/usr/include/efi -I/usr/include/efi/x86_64 \
           -c main.c linux-uefi.c clibc-user-impl.c crosslibc/string.c
 
     - name: Enlazar Binario Final con Formato .efi
       run: |
-        # El orden de los objetos e -lgcc resuelven los símbolos cruzados de read, write y chkstk sin arrastrar atexit
+        # 1. Colocamos linux-uefi.o AL FINAL para que resuelva las llamadas previas
+        # 2. Agregamos las librerías estáticas de GNU-EFI explícitamente (-lgnuefi -lefi)
+        # 3. Agregamos -Wl,--entry=efi_main para sobreescribir la necesidad de atexit de Windows
         x86_64-w64-mingw32-gcc -nostdlib -shared \
-          -Wl,--subsystem,10 -Wl,-e efi_main \
+          -Wl,--subsystem,10 -Wl,--entry=efi_main -Wl,-e,efi_main \
           -Wl,--allow-multiple-definition \
           main.o clibc-user-impl.o string.o linux-uefi.o \
-          -lgcc \
+          -L/usr/lib -lgnuefi -lefi -lgcc \
           -o load_elf_binary.efi
 
     - name: Guardar Artefacto Ejecutable (.efi)
