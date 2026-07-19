@@ -24,19 +24,22 @@ jobs:
     - name: Compilar Archivos Objeto (C a .o)
       run: |
         # 1. -DCLIBC_NO_LL_HEAP activa tu heap dinámico
-        # 2. -I/usr/include/efi mapea el efi.h que le faltaba a linux-uefi.c
-        # 3. -Icrosslibc permite usar las cabeceras minimalistas sin conflictos
+        # 2. -fno-builtin evita que MinGW busque funciones internas por defecto
+        # 3. Incluimos las rutas de GNU-EFI para resolver efi.h
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
-          -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar \
+          -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar -fno-builtin \
           -DCLIBC_NO_LL_HEAP \
           -I. -Icrosslibc -I/usr/include/efi -I/usr/include/efi/x86_64 \
           -c main.c linux-uefi.c clibc-user-impl.c
 
     - name: Enlazar Binario Final con Formato .efi
       run: |
+        # Linkeo estático enlazando libgnuefi.a y libefi.a de gnu-efi
+        # Usamos -lmingw32 y -lgcc para limpiar el warning de __main y chkstk
         x86_64-w64-mingw32-gcc -nostdlib -shared \
           -Wl,--subsystem,10 -Wl,-e efi_main \
           main.o linux-uefi.o clibc-user-impl.o \
+          -L/usr/lib -lgnuefi -lefi -lgcc \
           -o load_elf_binary.efi
 
     - name: Guardar Artefacto Ejecutable (.efi)
