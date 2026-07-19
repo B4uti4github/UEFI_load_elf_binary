@@ -17,11 +17,17 @@
 // Definiciones para control de E/S estándar (reemplazando unistd.h / fcntl.h)
 #define STDOUT_FILENO 1
 #define O_RDONLY      0x0000
+// REMAPEO DE SYSCALLS AL CARGADOR NATIVO (Prefijos fd_ y mem_)
+#define open  fd_open
+#define read  fd_read
+#define write fd_write
+#define mmap  mem_mmap
 
-// Declaraciones explícitas de las syscalls emuladas para evitar warnings
-int open(const char *pathname, int flags);
-long read(int fd, void *buf, unsigned long count);
-long write(int fd, const void *buf, unsigned long count);
+// Declaraciones de firmas exactas imitando tu cabecera original
+int fd_open(const char *pathname, int flags);
+long fd_read(int fd, void *buf, size_t count);
+long fd_write(int fd, const void *buf, size_t count);
+void *mem_mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 
 // DEFINICIONES MANUALES REEMPLAZANDO A "sys/mman.h"
 #ifndef MAP_FAILED

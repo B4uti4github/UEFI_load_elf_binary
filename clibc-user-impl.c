@@ -1,11 +1,17 @@
 #include "crosslibc/user-impl.h"
 #include "crosslibc/string.h"
 
-// Declaraciones manuales para evitar warnings
-long write(int fd, const void *buf, unsigned long count);
-long read(int fd, void *buf, unsigned long count);
-void *mmap(void *addr, unsigned long length, int prot, int flags, int fd, long offset);
-int munmap(void *addr, unsigned long length);
+// REMAPEO DE SYSCALLS AL CARGADOR NATIVO (Prefijos fd_ y mem_)
+#define write  fd_write
+#define read   fd_read
+#define mmap   mem_mmap
+#define munmap mem_munmap
+
+// Declaraciones de firmas exactas imitando tu cabecera original
+long fd_write(int fd, const void *buf, size_t count);
+long fd_read(int fd, void *buf, size_t count);
+void *mem_mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
+int mem_munmap(void *addr, size_t length);
 
 // Definición manual de constantes mmap de Linux para entornos autónomos (UEFI)
 #ifndef PROT_READ
