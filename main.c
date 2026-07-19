@@ -116,15 +116,23 @@ void print_error() {
  * we just take a simple char* filename as argument: int load_elf_binary(char* filename)
  */
 int main(int argc, char **argv) {
-    /* ENTER macro equivalent */
-
     /* **** Save the filename argument into the filename variable **** */
-    /* check if we received enough arguments */
-    /* cmp qword [rbp+8*2], 0x02; jne .print_usage */
-    if (argc != 2) {
-        goto print_usage;
-    }
+    
+    // COMENTAMOS EL COLO PARA EVITAR EL RETORNO DE USAGE SI ARGC VARÍA EN UEFI
+    // if (argc != 2) {
+    //     goto print_usage;
+    // }
 
+    // Si argc es igual a 2, tomamos el argumento normal.
+    // Si la shell lo mapeó diferente y argc es 1, asumimos que el primer parámetro es el ELF.
+    if (argc >= 2) {
+        ELF_FILENAME = argv[1];
+    } else if (argc == 1 && argv[0] != NULL) {
+        ELF_FILENAME = argv[0];
+    } else {
+        // Fallback duro por si se ejecuta vacío: le clavamos el nombre exacto de tu Toybox
+        ELF_FILENAME = "toybox-x86_64"; 
+    }
     /* else continue with execution */
     /* mov rsi, [rbp+8*3]; mov [ELF_FILENAME], rsi */
     ELF_FILENAME = argv[1];
