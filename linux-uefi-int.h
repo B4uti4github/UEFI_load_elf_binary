@@ -10,7 +10,7 @@
 typedef unsigned short wchar_t;
 #endif /* __cplusplus */
 
-typedef unsigned long size_t;
+// typedef unsigned long size_t;
 typedef signed long ssize_t;
 typedef signed long time_t;
 typedef signed long off_t;

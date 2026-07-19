@@ -1,9 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
+#include "crosslibc/stdio.h"
+#include "crosslibc/stdlib.h"
+#include "crosslibc/string.h"
 
 /* 
  * This file contains a kind of extended prove of concept of a custome implementation of the 
@@ -16,6 +13,15 @@
 #endif
 
 #define ELFMAG0 0x7f /* \177 */
+
+// Definiciones para control de E/S estándar (reemplazando unistd.h / fcntl.h)
+#define STDOUT_FILENO 1
+#define O_RDONLY      0x0000
+
+// Declaraciones explícitas de las syscalls emuladas para evitar warnings
+int open(const char *pathname, int flags);
+long read(int fd, void *buf, unsigned long count);
+long write(int fd, const void *buf, unsigned long count);
 
 // DEFINICIONES MANUALES REEMPLAZANDO A "sys/mman.h"
 #ifndef MAP_FAILED
@@ -39,7 +45,7 @@
 #endif
 
 // Declaración explícita de mmap para evitar "implicit declaration" warnings
-void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 
 /* section .bss */
 char *ELF_FILENAME;   /* quad word variable to store the char pointer to the filename */

@@ -14,22 +14,23 @@ jobs:
     - name: Descargar Código Fuente y Submódulos
       uses: actions/checkout@v4
       with:
-        # Crucial: Esto le dice a GitHub que clone crosslibc dentro de su carpeta
         submodules: 'recursive'
 
-    - name: Instalar Compilador Cruzado para formato PE/COFF (UEFI)
+    - name: Instalar Compilador Cruzado y Cabeceras UEFI de GNU
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-mingw-w64-x86-64 build-essential
+        sudo apt-get install -y gcc-mingw-w64-x86-64 build-essential gnu-efi
 
     - name: Compilar Archivos Objeto (C a .o)
       run: |
-        # 1. -DCLIBC_NO_LL_HEAP activa tu heap_alloc basado en mmap
-        # 2. -Icrosslibc le indica al compilador que busque las cabeceras estándar (como string.h) dentro del submódulo
+        # 1. -DCLIBC_NO_LL_HEAP activa tu heap dinámico
+        # 2. -I/usr/include/efi mapea el efi.h que le faltaba a linux-uefi.c
+        # 3. -Icrosslibc permite usar las cabeceras minimalistas sin conflictos
         x86_64-w64-mingw32-gcc -Wall -Wextra -ffreestanding \
           -fno-stack-protector -mno-red-zone -fPIC -fshort-wchar \
           -DCLIBC_NO_LL_HEAP \
-          -I. -Icrosslibc -c main.c linux-uefi.c clibc-user-impl.c
+          -I. -Icrosslibc -I/usr/include/efi -I/usr/include/efi/x86_64 \
+          -c main.c linux-uefi.c clibc-user-impl.c
 
     - name: Enlazar Binario Final con Formato .efi
       run: |
